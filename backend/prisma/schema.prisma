@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  nik       String?  @unique
+  kk        String?
+  address   String?
+  phone     String?
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  photo     String?
+  pushToken String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  payments           Payment[]      @relation("UserPayments")
+  receivedPayments   Payment[]      @relation("ReceivedBy")
+  announcements      Announcement[]
+
+  @@index([role])
+  @@index([nik])
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  BENDAHARA
+  USER
+}
+
+model PaymentType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  amount    Decimal  @db.Decimal(12, 2)
+  frequency String   // 'monthly' | 'yearly' | 'once'
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  payments  Payment[]
+
+  @@map("payment_types")
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  paymentTypeId Int
+  amount        Decimal  @db.Decimal(12, 2)
+  month         Int?
+  year          Int?
+  paymentDate   DateTime
+  status        String   @default("pending") // 'paid' | 'pending'
+  receivedById  Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user        User        @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  paymentType PaymentType @relation(fields: [paymentTypeId], references: [id], onDelete: Restrict)
+  receivedBy  User?       @relation("ReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([year, month])
+  @@map("payments")
+}
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  image     String?
+  createdBy Int
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  creator   User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([isPinned, createdAt(sort: Desc)])
+  @@map("announcements")
+}
