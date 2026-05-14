@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "RT Warga & Iuran",
+    "slug": "rt-warga-iuran",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "rtwarga",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6200ee"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rtwarga.iuran"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6200ee"
+      },
+      "package": "com.rtwarga.iuran"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
