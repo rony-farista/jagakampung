@@ -34,11 +34,6 @@ export default function TabsLayout() {
         tabBarLabel: 'Info',
         tabBarIcon: ({ color }) => <TabIcon name="megaphone" color={color} />,
       }} />
-      <Tabs.Screen name="forum" options={{
-        title: 'Forum Diskusi',
-        tabBarLabel: 'Forum',
-        tabBarIcon: ({ color }) => <TabIcon name="chatbubbles" color={color} />,
-      }} />
       <Tabs.Screen name="profile" options={{
         title: 'Profil',
         tabBarLabel: 'Profil',
@@ -70,9 +65,23 @@ export default function TabsLayout() {
         tabBarIcon: ({ color }) => <TabIcon name="create" color={color} />,
         href: isAdminOrBendahara ? undefined : null,
       }} />
-      {/* Forum hidden screens */}
-      <Tabs.Screen name="forum-detail" options={{ href: null, title: 'Detail Diskusi' }} />
-      <Tabs.Screen name="create-forum-post" options={{ href: null, title: 'Buat Diskusi' }} />
+
+      {/* Forum Diskusi - visible to all */}
+      <Tabs.Screen name="forum" options={{
+        title: 'Forum Diskusi',
+        tabBarLabel: 'Forum',
+        tabBarIcon: ({ color }) => <TabIcon name="chatbubbles" color={color} />,
+      }} />
+
+      {/* Hidden tabs - accessible but not shown in tab bar */}
+      <Tabs.Screen name="forum-detail" options={{
+        title: 'Detail Diskusi',
+        href: null,
+      }} />
+      <Tabs.Screen name="create-forum-post" options={{
+        title: 'Buat Diskusi',
+        href: null,
+      }} />
     </Tabs>
   );
 }

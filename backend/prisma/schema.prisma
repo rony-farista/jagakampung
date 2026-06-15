@@ -28,12 +28,12 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  payments           Payment[]      @relation("UserPayments")
-  receivedPayments   Payment[]      @relation("ReceivedBy")
-  announcements      Announcement[]
-  forumPosts         ForumPost[]
-  forumComments      ForumComment[]
-  forumLikes         ForumLike[]
+  payments         Payment[]      @relation("UserPayments")
+  receivedPayments Payment[]      @relation("ReceivedBy")
+  announcements    Announcement[]
+  forumPosts       ForumPost[]
+  forumComments    ForumComment[]
+  forumLikes       ForumLike[]
 
   @@index([role])
   @@index([nik])
@@ -50,13 +50,13 @@ model PaymentType {
   id        Int      @id @default(autoincrement())
   name      String
   amount    Decimal  @db.Decimal(12, 2)
-  frequency String   // 'monthly' | 'yearly' | 'once'
+  frequency String // 'monthly' | 'yearly' | 'once'
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  payments  Payment[]
+  payments Payment[]
 
   @@map("payment_types")
 }
@@ -97,7 +97,7 @@ model Announcement {
   updatedAt DateTime @updatedAt
 
   // Relations
-  creator   User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([isPinned, createdAt(sort: Desc)])
   @@map("announcements")
@@ -115,10 +115,12 @@ model ForumPost {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  creator  User           @relation(fields: [createdBy], references: [id])
+  creator  User           @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   comments ForumComment[]
   likes    ForumLike[]
 
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
   @@map("forum_posts")
 }
 
@@ -132,8 +134,9 @@ model ForumComment {
 
   // Relations
   post    ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  creator User      @relation(fields: [createdBy], references: [id])
+  creator User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
+  @@index([postId])
   @@map("forum_comments")
 }
 
@@ -145,7 +148,7 @@ model ForumLike {
 
   // Relations
   post ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User      @relation(fields: [userId], references: [id])
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
   @@map("forum_likes")

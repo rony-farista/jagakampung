@@ -1,26 +1,37 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, ScrollView, StyleSheet, KeyboardAvoidingView,
-  Platform, Alert, TouchableOpacity
+  View,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput as RNTextInput,
+  Alert,
+  TouchableOpacity,
 } from 'react-native';
-import { Text, Card, Chip, TextInput, Button, ActivityIndicator, Divider } from 'react-native-paper';
+import { Text, ActivityIndicator, Divider } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ForumPost, ForumComment } from '../../types';
 
-const CATEGORY_COLORS: Record<string, string> = {
-  umum: '#1976D2',
-  pertanyaan: '#F57C00',
-  saran: '#388E3C',
-};
-
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
+
+const CATEGORY_COLORS: Record<string, string> = {
+  umum: '#2196F3',
+  pertanyaan: '#FF9800',
+  saran: '#4CAF50',
+};
 
 export default function ForumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,47 +39,67 @@ export default function ForumDetailScreen() {
   const { user } = useAuth();
   const [post, setPost] = useState<ForumPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [likeLoading, setLikeLoading] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [liking, setLiking] = useState(false);
 
   const fetchPost = async () => {
     try {
+      setError(null);
       const res = await api.get(`/forum/${id}`);
-      setPost(res.data.post);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+      setPost(res.data);
+    } catch (e: any) {
+      setError('Gagal memuat diskusi');
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchPost(); }, [id]));
+  useEffect(() => {
+    setLoading(true);
+    fetchPost().finally(() => setLoading(false));
+  }, [id]);
 
-  const handleLike = async () => {
-    if (!post || likeLoading) return;
-    setLikeLoading(true);
+  const handleToggleLike = async () => {
+    if (!post || liking) return;
+    setLiking(true);
     try {
       const res = await api.post(`/forum/${post.id}/like`);
-      setPost({ ...post, isLiked: res.data.liked, likesCount: res.data.likesCount });
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              isLiked: res.data.isLiked,
+              likesCount: res.data.isLiked ? prev.likesCount + 1 : prev.likesCount - 1,
+            }
+          : prev
+      );
     } catch (e) {
-      console.error(e);
+      Alert.alert('Error', 'Gagal mengubah like');
     } finally {
-      setLikeLoading(false);
+      setLiking(false);
     }
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim() || !post) return;
-    setSubmitting(true);
+    if (!commentText.trim() || submittingComment) return;
+    setSubmittingComment(true);
     try {
-      await api.post(`/forum/${post.id}/comments`, { content: commentText.trim() });
+      const res = await api.post(`/forum/${id}/comments`, { content: commentText.trim() });
+      const newComment: ForumComment = res.data;
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              comments: [...(prev.comments || []), newComment],
+              commentsCount: prev.commentsCount + 1,
+            }
+          : prev
+      );
       setCommentText('');
-      fetchPost();
     } catch (e) {
       Alert.alert('Error', 'Gagal menambahkan komentar');
     } finally {
-      setSubmitting(false);
+      setSubmittingComment(false);
     }
   };
 
@@ -76,7 +107,8 @@ export default function ForumDetailScreen() {
     Alert.alert('Hapus Diskusi', 'Yakin ingin menghapus diskusi ini?', [
       { text: 'Batal', style: 'cancel' },
       {
-        text: 'Hapus', style: 'destructive',
+        text: 'Hapus',
+        style: 'destructive',
         onPress: async () => {
           try {
             await api.delete(`/forum/${id}`);
@@ -84,120 +116,160 @@ export default function ForumDetailScreen() {
           } catch (e) {
             Alert.alert('Error', 'Gagal menghapus diskusi');
           }
-        }
-      }
+        },
+      },
     ]);
   };
 
-  const handleDeleteComment = (comment: ForumComment) => {
+  const handleDeleteComment = (commentId: number) => {
     Alert.alert('Hapus Komentar', 'Yakin ingin menghapus komentar ini?', [
       { text: 'Batal', style: 'cancel' },
       {
-        text: 'Hapus', style: 'destructive',
+        text: 'Hapus',
+        style: 'destructive',
         onPress: async () => {
           try {
-            await api.delete(`/forum/${id}/comments/${comment.id}`);
-            fetchPost();
+            await api.delete(`/forum/${id}/comments/${commentId}`);
+            setPost((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    comments: (prev.comments || []).filter((c) => c.id !== commentId),
+                    commentsCount: prev.commentsCount - 1,
+                  }
+                : prev
+            );
           } catch (e) {
             Alert.alert('Error', 'Gagal menghapus komentar');
           }
-        }
-      }
+        },
+      },
     ]);
   };
 
-  const canDeletePost = post && (post.creator?.id === user?.id || user?.role === 'ADMIN');
-  const canDeleteComment = (c: ForumComment) => c.creator?.id === user?.id || user?.role === 'ADMIN';
-
   if (loading) {
-    return <ActivityIndicator style={styles.loader} color="#6200ee" />;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#6200ee" />
+      </View>
+    );
   }
 
-  if (!post) {
-    return <Text style={styles.empty}>Diskusi tidak ditemukan</Text>;
+  if (error || !post) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>{error || 'Diskusi tidak ditemukan'}</Text>
+      </View>
+    );
   }
+
+  const canDeletePost =
+    user?.id === post.creator?.id || user?.role === 'ADMIN';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-        <Card style={styles.postCard}>
-          <Card.Content>
-            <View style={styles.chipRow}>
-              <Chip
-                style={[styles.categoryChip, { backgroundColor: CATEGORY_COLORS[post.category] || '#888' }]}
-                textStyle={{ color: '#fff', fontSize: 11 }}
-              >
-                {post.category}
-              </Chip>
-              {canDeletePost && (
-                <TouchableOpacity onPress={handleDeletePost} style={styles.deleteBtn}>
-                  <Ionicons name="trash-outline" size={20} color="#e53935" />
-                </TouchableOpacity>
-              )}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        {/* Post header */}
+        <View style={styles.postCard}>
+          <View style={styles.postTopRow}>
+            <View
+              style={[
+                styles.categoryBadge,
+                { backgroundColor: CATEGORY_COLORS[post.category] || '#888' },
+              ]}
+            >
+              <Text style={styles.categoryText}>{post.category}</Text>
             </View>
-            <Text variant="titleLarge" style={styles.postTitle}>{post.title}</Text>
-            <Text variant="bodySmall" style={styles.meta}>
-              {post.creator?.name} · {formatDate(post.createdAt)}
-            </Text>
-            <Text variant="bodyMedium" style={styles.content}>{post.content}</Text>
-            <TouchableOpacity onPress={handleLike} style={styles.likeBtn} disabled={likeLoading}>
+            {canDeletePost && (
+              <TouchableOpacity onPress={handleDeletePost} style={styles.deleteBtn}>
+                <Ionicons name="trash-outline" size={20} color="#e53935" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={styles.postTitle}>{post.title}</Text>
+          <Text style={styles.postMeta}>
+            {post.creator?.name || 'Anonim'} &middot; {formatDate(post.createdAt)}
+          </Text>
+          <Text style={styles.postContent}>{post.content}</Text>
+
+          {/* Like row */}
+          <View style={styles.likeRow}>
+            <TouchableOpacity onPress={handleToggleLike} style={styles.likeBtn} disabled={liking}>
               <Ionicons
                 name={post.isLiked ? 'heart' : 'heart-outline'}
                 size={22}
                 color={post.isLiked ? '#e53935' : '#888'}
               />
-              <Text style={[styles.likeText, post.isLiked && { color: '#e53935' }]}>
-                {post.likesCount} Suka
+              <Text style={[styles.likeCount, post.isLiked && { color: '#e53935' }]}>
+                {post.likesCount}
               </Text>
             </TouchableOpacity>
-          </Card.Content>
-        </Card>
+            <View style={styles.commentCount}>
+              <Ionicons name="chatbubble-outline" size={20} color="#888" />
+              <Text style={styles.likeCount}>{post.commentsCount}</Text>
+            </View>
+          </View>
+        </View>
 
-        <Text variant="titleSmall" style={styles.commentsHeader}>
-          Komentar ({post.commentsCount})
-        </Text>
         <Divider />
 
-        {(post.comments || []).map((c) => (
-          <Card key={c.id} style={styles.commentCard}>
-            <Card.Content>
-              <View style={styles.commentHeader}>
-                <Text variant="labelMedium" style={styles.commentAuthor}>{c.creator?.name}</Text>
-                <View style={styles.commentRight}>
-                  <Text variant="bodySmall" style={styles.commentDate}>{formatDate(c.createdAt)}</Text>
-                  {canDeleteComment(c) && (
-                    <TouchableOpacity onPress={() => handleDeleteComment(c)} style={{ marginLeft: 8 }}>
-                      <Ionicons name="trash-outline" size={16} color="#e53935" />
-                    </TouchableOpacity>
-                  )}
+        {/* Comments section */}
+        <View style={styles.commentsSection}>
+          <Text style={styles.commentsTitle}>Komentar ({post.commentsCount})</Text>
+          {(post.comments || []).length === 0 ? (
+            <Text style={styles.emptyComments}>Belum ada komentar. Jadilah yang pertama!</Text>
+          ) : (
+            (post.comments || []).map((comment) => {
+              const canDeleteComment =
+                user?.id === comment.creator?.id || user?.role === 'ADMIN';
+              return (
+                <View key={comment.id} style={styles.commentCard}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{comment.creator?.name || 'Anonim'}</Text>
+                    {canDeleteComment && (
+                      <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
+                        <Ionicons name="close-circle-outline" size={18} color="#e53935" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.commentContent}>{comment.content}</Text>
+                  <Text style={styles.commentDate}>{formatDate(comment.createdAt)}</Text>
                 </View>
-              </View>
-              <Text variant="bodyMedium">{c.content}</Text>
-            </Card.Content>
-          </Card>
-        ))}
+              );
+            })
+          )}
+        </View>
       </ScrollView>
 
-      <View style={styles.inputBar}>
-        <TextInput
-          mode="outlined"
+      {/* Comment input */}
+      <View style={styles.inputRow}>
+        <RNTextInput
+          style={styles.commentInput}
           placeholder="Tulis komentar..."
           value={commentText}
           onChangeText={setCommentText}
-          style={styles.commentInput}
-          dense
           multiline
+          maxLength={500}
         />
-        <Button
-          mode="contained"
+        <TouchableOpacity
           onPress={handleAddComment}
-          loading={submitting}
-          disabled={!commentText.trim() || submitting}
-          style={styles.sendBtn}
-          contentStyle={{ height: 44 }}
+          disabled={submittingComment || !commentText.trim()}
+          style={[
+            styles.sendBtn,
+            (!commentText.trim() || submittingComment) && styles.sendBtnDisabled,
+          ]}
         >
-          Kirim
-        </Button>
+          {submittingComment ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="send" size={20} color="#fff" />
+          )}
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -205,28 +277,61 @@ export default function ForumDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  loader: { flex: 1, marginTop: 80 },
-  empty: { textAlign: 'center', marginTop: 40, color: '#aaa' },
-  postCard: { margin: 12, borderRadius: 10 },
-  chipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  categoryChip: { alignSelf: 'flex-start' },
+  scrollContent: { paddingBottom: 16 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  errorText: { color: '#e53935', fontSize: 14 },
+  postCard: { backgroundColor: '#fff', padding: 16, marginBottom: 2 },
+  postTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  categoryBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
+  categoryText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   deleteBtn: { padding: 4 },
-  postTitle: { fontWeight: 'bold', marginBottom: 4 },
-  meta: { color: '#888', marginBottom: 12 },
-  content: { lineHeight: 22, marginBottom: 16 },
+  postTitle: { fontSize: 20, fontWeight: '700', color: '#222', marginBottom: 4 },
+  postMeta: { fontSize: 12, color: '#999', marginBottom: 12 },
+  postContent: { fontSize: 15, color: '#444', lineHeight: 22, marginBottom: 16 },
+  likeRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  likeText: { fontSize: 14, color: '#888' },
-  commentsHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, color: '#333' },
-  commentCard: { marginHorizontal: 12, marginTop: 8, borderRadius: 8 },
-  commentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  commentAuthor: { fontWeight: 'bold', color: '#6200ee' },
-  commentRight: { flexDirection: 'row', alignItems: 'center' },
-  commentDate: { color: '#aaa', fontSize: 11 },
-  inputBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', padding: 8, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#eee', gap: 8, alignItems: 'flex-end'
+  likeCount: { fontSize: 14, color: '#888' },
+  commentCount: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  commentsSection: { backgroundColor: '#fff', padding: 16, marginTop: 2 },
+  commentsTitle: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
+  emptyComments: { color: '#999', fontSize: 13, fontStyle: 'italic' },
+  commentCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#6200ee',
+    paddingLeft: 10,
+    marginBottom: 14,
   },
-  commentInput: { flex: 1, backgroundColor: '#fff', maxHeight: 100 },
-  sendBtn: { backgroundColor: '#6200ee', alignSelf: 'flex-end' },
+  commentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  commentAuthor: { fontSize: 13, fontWeight: '600', color: '#6200ee' },
+  commentContent: { fontSize: 14, color: '#444', lineHeight: 20 },
+  commentDate: { fontSize: 11, color: '#bbb', marginTop: 4 },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    padding: 8,
+    gap: 8,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+    maxHeight: 100,
+    backgroundColor: '#fafafa',
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendBtnDisabled: { backgroundColor: '#ccc' },
 });

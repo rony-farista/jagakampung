@@ -52,14 +52,14 @@ export interface ForumPost {
   likesCount: number;
   commentsCount: number;
   isLiked?: boolean;
-  creator?: { id: number; name: string; role: string };
   createdAt: string;
+  creator?: { id: number; name: string; role: string };
   comments?: ForumComment[];
 }
 
 export interface ForumComment {
   id: number;
   content: string;
-  creator?: { id: number; name: string; role: string };
   createdAt: string;
+  creator?: { id: number; name: string; role: string };
 }
