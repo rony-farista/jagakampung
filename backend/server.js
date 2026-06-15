@@ -18,6 +18,7 @@ const userRoutes = require('./routes/users');
 const paymentTypeRoutes = require('./routes/paymentTypes');
 const paymentRoutes = require('./routes/payments');
 const announcementRoutes = require('./routes/announcements');
+const forumRoutes = require('./routes/forum');
 
 // Routes
 app.get('/', (req, res) => {
@@ -39,6 +40,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/payment-types', paymentTypeRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/forum', forumRoutes);
 
 // 404 handler
 app.use((req, res) => {

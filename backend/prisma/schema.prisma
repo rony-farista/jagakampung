@@ -31,6 +31,9 @@ model User {
   payments           Payment[]      @relation("UserPayments")
   receivedPayments   Payment[]      @relation("ReceivedBy")
   announcements      Announcement[]
+  forumPosts         ForumPost[]
+  forumComments      ForumComment[]
+  forumLikes         ForumLike[]
 
   @@index([role])
   @@index([nik])
@@ -98,4 +101,52 @@ model Announcement {
 
   @@index([isPinned, createdAt(sort: Desc)])
   @@map("announcements")
+}
+
+model ForumPost {
+  id            Int      @id @default(autoincrement())
+  title         String
+  content       String
+  createdBy     Int
+  category      String   @default("umum")
+  likesCount    Int      @default(0)
+  commentsCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  creator  User           @relation(fields: [createdBy], references: [id])
+  comments ForumComment[]
+  likes    ForumLike[]
+
+  @@map("forum_posts")
+}
+
+model ForumComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  content   String
+  createdBy Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  post    ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  creator User      @relation(fields: [createdBy], references: [id])
+
+  @@map("forum_comments")
+}
+
+model ForumLike {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  post ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@map("forum_likes")
 }

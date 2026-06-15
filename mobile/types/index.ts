@@ -40,5 +40,26 @@ export interface Announcement {
   content: string;
   image?: string;
   isPinned: boolean;
+  createdAt?: string;
   creator?: { id: number; name: string; role: string };
+}
+
+export interface ForumPost {
+  id: number;
+  title: string;
+  content: string;
+  category: string;
+  likesCount: number;
+  commentsCount: number;
+  isLiked?: boolean;
+  creator?: { id: number; name: string; role: string };
+  createdAt: string;
+  comments?: ForumComment[];
+}
+
+export interface ForumComment {
+  id: number;
+  content: string;
+  creator?: { id: number; name: string; role: string };
+  createdAt: string;
 }
